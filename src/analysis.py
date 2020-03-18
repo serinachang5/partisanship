@@ -1,8 +1,21 @@
 import matplotlib.pyplot as plt
-from model import Model
+from model import Model, Legislator
 import numpy as np
 from scipy.stats import ncx2
 from scipy.integrate import simps
+
+def plot_single_similarity_curve(lmbs):
+    l = Legislator(0, 0, 0)  # only thing that matters is ideal_point
+    plt.vlines([0], 0, 1, linestyles='dashed', alpha=.5, label='x_i')
+    for lmb in lmbs:
+        bills = np.arange(-4, 4, 0.1)
+        sims = [l.get_similarity(b, lmb) for b in bills]
+        plt.plot(bills, sims, label='l=%s' % lmb)
+    plt.xlabel('z_j')
+    plt.ylabel('sim_ij')
+    plt.legend()
+    plt.grid(alpha=0.5)
+    plt.show()
 
 def get_observed_sim_sf(mdl, bill):
     sims = [l.get_similarity(bill, mdl.lmb) for l in mdl.legislators]
@@ -125,6 +138,7 @@ def plot_party_tradeoff(lmb, party_dist, dim, gran=2, print_analysis=False):
     plt.title('lmb=%s, dim=%s, party_dist=%s' % (lmb, dim, party_dist))
     plt.xlabel('Distance of bill from party A')
     plt.ylabel('Avg utility')
+    plt.grid(alpha=.3)
     plt.show()
 
 def get_party_individual_tradeoff(lmb, party_dist, dim, halfway=False, scale=100):
@@ -169,13 +183,23 @@ def plot_lambda_versus_max_util(lmbs, party_dists, dim):
     plt.grid(alpha=.3)
     plt.show()
 
-def plot_dist_versus_max_util(lmbs, party_dists, dim):
+def plot_dist_versus_max_util_and_argmax(lmbs, party_dists, dim):
+    all_utils = []
+    all_pos = []
     for lmb in lmbs:
-        max_utils = []
+        utils = []
+        pos = []
+        nonmid = False
         for dist in party_dists:
             D, E_a, E_b, total = get_party_tradeoff(lmb, dist, dim, halfway=True)
-            max_utils.append(max(total))
-        plt.plot(party_dists, max_utils, label='lmb=%.2f' % lmb)
+            utils.append(max(total))
+            argmax = np.argmax(total)
+            pos.append(D[argmax] / dist)
+        all_utils.append(utils)
+        all_pos.append(pos)
+
+    for lmb, utils in zip(lmbs, all_utils):
+        plt.plot(party_dists, utils, label='lmb=%.2f' % lmb)
     plt.xlabel('Party distance')
     plt.ylabel('Optimal utility')
     plt.legend()
@@ -183,10 +207,17 @@ def plot_dist_versus_max_util(lmbs, party_dists, dim):
     plt.grid(alpha=.3)
     plt.show()
 
-def plot_dist_versus_optimal_bill_rel_pos(party_dists):
-    # TO DO: fix, lambda need to be varied
-    lmb = 0.5
-    for dim in range(1, 5):
+    for lmb, pos in zip(lmbs, all_pos):
+        plt.plot(party_dists, pos, label='lmb=%.2f' % lmb)
+    plt.xlabel('Party distance')
+    plt.ylabel('Relative pos. of optimal bill')
+    plt.legend()
+    plt.title('dim=%s' % dim)
+    plt.grid(alpha=.3)
+    plt.show()
+
+def plot_dist_versus_optimal_bill_rel_pos(lmbs, party_dists, dim):
+    for lmb in lmbs:
         pos = []
         nonmid = False
         for dist in party_dists:
@@ -195,9 +226,9 @@ def plot_dist_versus_optimal_bill_rel_pos(party_dists):
             rel_pos = D[argmax] / dist
             pos.append(rel_pos)
             if nonmid is False and rel_pos < .5:
-                print('dim = %s: first dist with non-midpoint = %.2f' % (dim, dist))
+                print('lmb = %s: first dist with non-midpoint = %.2f' % (lmb, dist))
                 nonmid = True
-        plt.plot(party_dists, pos, label='dim=%d' % dim)
+        plt.plot(party_dists, pos, label='lmb=%.2f' % lmb)
     plt.xlabel('Party distance')
     plt.ylabel('Rel. position of optimal bill')
     plt.legend()
@@ -214,14 +245,16 @@ def compare_individual_vs_avg(lmb, dim, dists, scale=1000):
         print('Dist = %.3f -> avg sim: %.3f, p(sim_ij > 0.5) = %.3f' % (dist, exp_sim, sf_at_mid))
 
 if __name__ == '__main__':
-    test_sim_sf([0, 0], [1e-10, 1e-10], 1)
-    # plot_expected_sim_curves(0.5, 2, 1)
-    # plot_party_tradeoff(0.5, 3, 1, print_analysis=True)
-    # plot_party_individual_tradeoff(0.5, 2, 1)
-    # dists = [i / 4 for i in range(1, 9)]  # [1, 2, 3, 4, 5]  #
-    # plot_d_curves(.5, 1, dists)
-    # lmbs = [.5, 1, 1.5, 2]  # [i / 10 for i in range(1, 21)]
-    # plot_lambda_versus_optimal_bill(lmbs, dists, 1)
-    # plot_dist_versus_optimal_bill(lmbs, dists, 1)
-    # plot_dist_versus_optimal_bill_rel_pos(dists)
-    # compare_individual_vs_avg(.25, 1, dists)
+    # Fig 1
+    lmbs = [0.25, 1, 4]
+    plot_single_similarity_curve(lmbs)
+
+    # Fig 3
+    plot_party_tradeoff(0.5, 2, 1, print_analysis=True)
+    plot_party_tradeoff(0.5, 4, 1, print_analysis=True)
+
+    # Fig 4
+    lmbs = [0.5, 1, 1.5, 2]
+    dists = [i / 10 for i in range(1, 51)]
+    plot_dist_versus_max_util_and_argmax(lmbs, dists, 1)
+    plot_dist_versus_optimal_bill_rel_pos(lmbs, dists, 1)
